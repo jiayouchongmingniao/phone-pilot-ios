@@ -20,7 +20,7 @@
    - 套装 ID：`io.tikpal.phonepilot`。下拉里没有的话，先到 developer.apple.com →「Certificates, Identifiers & Profiles」→「Identifiers」用这个 ID 注册一个 App ID。
    - SKU：随便填一个自己认得的，比如 `phonepilot`
 2. **建 API 密钥**：App Store Connect →「用户和访问」→「集成」→「App Store Connect API」→「团队密钥」→ 生成。
-   - 角色选「App 管理」。
+   - 角色选「管理」（Admin）。「App 管理」能归档，但导出时没有权限用云端管理的发布证书，会报 `Cloud signing permission error`（2026-11-02 实测）。
    - 下载 `AuthKey_XXXXXXXXXX.p8`。**只能下载一次**，存好，不要放进任何仓库。
    - 记下页面上的「密钥 ID」和「Issuer ID」。
 3. **团队 ID**：developer.apple.com →「Membership details」里的 Team ID（10 位）。
@@ -49,5 +49,6 @@ gh run watch -R jiayouchongmingniao/phone-pilot-ios
 ## 出错时先看
 
 - 「缺少仓库密钥」：第 4 步有没有存全，名字要一字不差。
+- 导出时报 `Cloud signing permission error`：API 密钥的角色不够，换一个「管理」（Admin）角色的团队密钥。
 - 签名报错说找不到 App ID 或 App：第 1 步的套装 ID 和 `project.yml` 里的 `PRODUCT_BUNDLE_IDENTIFIER` 要一样。
 - 上传报图标错误：图标要 1024 × 1024、不带透明通道（`tools/make_icon.py` 生成的就是）。

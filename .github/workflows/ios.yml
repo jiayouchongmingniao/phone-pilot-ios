@@ -23,7 +23,7 @@ jobs:
     name: 编译（不签名）
     runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Xcode 版本
         run: xcodebuild -version
       - name: 生成工程（XcodeGen）
@@ -48,7 +48,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: 检查密钥
         shell: bash
         run: |
