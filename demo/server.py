@@ -128,27 +128,21 @@ def validate_action(action, frame):
     raise ValueError('不支持此操作；发送、付款和删除需手动完成')
 
 
-def openai_json(path, body, content_type):
-    key = os.environ.get('OPENAI_API_KEY')
-    if not key:
-        raise ValueError('Mac 未配置 OPENAI_API_KEY')
-    request = urllib.request.Request('https://api.openai.com/v1/' + path, body,
-        {'Authorization': 'Bearer ' + key, 'Content-Type': content_type})
-    try:
-        with urllib.request.urlopen(request, timeout=35) as response:
-            return json.load(response)
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-        raise ValueError('OpenAI 请求失败，请检查网络、密钥和模型权限') from exc
-
-
 def transcribe(wav):
     if not wav.startswith(b'RIFF') or len(wav) > 400000:
         raise ValueError('录音格式无效')
-    boundary = 'pilot' + secrets.token_hex(12)
-    body = (f'--{boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\ngpt-transcribe\r\n'
-            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="voice.wav"\r\n'
-            'Content-Type: audio/wav\r\n\r\n').encode() + wav + f'\r\n--{boundary}--\r\n'.encode()
-    text = openai_json('audio/transcriptions', body, 'multipart/form-data; boundary=' + boundary).get('text', '').strip()
+    key = os.environ.get('DASHSCOPE_API_KEY')
+    if not key: raise ValueError('Mac 未配置 DASHSCOPE_API_KEY')
+    endpoint = os.environ.get('DASHSCOPE_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1').rstrip('/')
+    body = {'model':'qwen3-asr-flash', 'messages':[{'role':'user','content':[{'type':'input_audio',
+            'input_audio':{'data':'data:audio/wav;base64,'+base64.b64encode(wav).decode()}}]}], 'stream':False}
+    request = urllib.request.Request(endpoint + '/chat/completions', json.dumps(body).encode(),
+        {'Authorization':'Bearer '+key,'Content-Type':'application/json'})
+    try:
+        with urllib.request.urlopen(request, timeout=35) as response: result=json.load(response)
+        text = result['choices'][0]['message']['content'].strip()
+    except (urllib.error.URLError, TimeoutError, ValueError, KeyError, IndexError, TypeError) as exc:
+        raise ValueError('Qwen 语音识别失败，请检查网络、密钥和区域') from exc
     if not text: raise ValueError('没有听清，请再说一次')
     return text
 
@@ -163,7 +157,7 @@ def decide(task, frame, previous):
       f"Task: {task['text']}. Previous action: {json.dumps(previous, ensure_ascii=False)}")
     key = os.environ.get('ANTHROPIC_API_KEY')
     if not key: raise ValueError('Mac 未配置 ANTHROPIC_API_KEY')
-    body = {'model':'claude-haiku-5-5', 'max_tokens':1024,
+    body = {'model':'claude-haiku-5-5', 'max_tokens':1024, 'thinking':{'type':'disabled'},
             'messages':[{'role':'user', 'content':[{'type':'image','source':{'type':'base64','media_type':'image/jpeg','data':frame['image']}},
                                                      {'type':'text','text':prompt}]}]}
     request = urllib.request.Request('https://api.anthropic.com/v1/messages', json.dumps(body).encode(),

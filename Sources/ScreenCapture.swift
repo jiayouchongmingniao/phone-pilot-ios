@@ -56,6 +56,9 @@ final class ScreenCapture: NSObject, ObservableObject {
     }
 
     func start(filter: SCContentFilter) async {
+        guard filter.style == .display else {
+            await stop(); error = "请选择整个屏幕"; return
+        }
         do {
             let config = SCStreamConfiguration()
             let next = SCStream(filter: filter, configuration: config, delegate: self)
