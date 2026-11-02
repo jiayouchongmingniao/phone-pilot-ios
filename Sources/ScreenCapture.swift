@@ -122,10 +122,15 @@ final class ScreenCapture: NSObject, ObservableObject {
     }
 }
 
+private struct SendableSampleBuffer: @unchecked Sendable {
+    let value: CMSampleBuffer
+}
+
 extension ScreenCapture: SCStreamOutput, SCStreamDelegate {
     nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen else { return }
-        MainActor.assumeIsolated { send(sampleBuffer) }
+        let wrapped = SendableSampleBuffer(value: sampleBuffer)
+        MainActor.assumeIsolated { send(wrapped.value) }
     }
     nonisolated func stream(_ stream: SCStream, didStopWithError error: Error) {
         Task { @MainActor in self.error = error.localizedDescription; await self.stop() }
