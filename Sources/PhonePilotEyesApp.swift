@@ -28,7 +28,7 @@ struct ContentView: View {
                     if let error = capture.error { Text(error).foregroundStyle(.red) }
                 }
                 Section {
-                    Text("画面通过当前 Wi-Fi 发给 Mac，任务所需画面会发送给 OpenAI。请只在可信网络使用。")
+                    Text("画面通过当前 Wi-Fi 发给 Mac，任务所需画面会发送给 Anthropic。请只在可信网络使用。")
                         .font(.footnote)
                 }
             }.navigationTitle("手机遥控")

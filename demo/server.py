@@ -26,6 +26,7 @@ class State:
         self.task = None
         self.pending = None
         self.last_action = None
+        self.pending_image = None
         self.steps = 0
         self.sequence = 0
 
@@ -73,7 +74,7 @@ class State:
 
     def finish(self):
         with self.lock:
-            self.task = self.pending = self.last_action = None
+            self.task = self.pending = self.last_action = self.pending_image = None
             self.steps = 0
 
     def propose(self, action, frame):
@@ -87,6 +88,7 @@ class State:
             clean = validate_action(action, frame)
             self.steps += 1
             self.pending = dict(clean, id=secrets.token_hex(8), frame=frame['sequence'], task=self.task['id'])
+            self.pending_image = frame['image']
             return dict(self.pending)
 
     def result(self, action_id, ok):
@@ -159,10 +161,18 @@ def decide(task, frame, previous):
       'key is tab or escape. For Chinese text return assist. Do not claim success without visible proof. '
       f"Screen size: {frame['point_width']} x {frame['point_height']} points; image size: {frame['width']} x {frame['height']} pixels. "
       f"Task: {task['text']}. Previous action: {json.dumps(previous, ensure_ascii=False)}")
-    body = {'model':'gpt-6.1-terra', 'store':False, 'input':[{'role':'user','content':[
-        {'type':'input_text','text':prompt}, {'type':'input_image','image_url':'data:image/jpeg;base64,'+frame['image']}]}]}
-    result = openai_json('responses', json.dumps(body).encode(), 'application/json')
-    outputs = [c.get('text','') for o in result.get('output',[]) for c in o.get('content',[]) if c.get('type') == 'output_text']
+    key = os.environ.get('ANTHROPIC_API_KEY')
+    if not key: raise ValueError('Mac 未配置 ANTHROPIC_API_KEY')
+    body = {'model':'claude-haiku-5-5', 'max_tokens':1024,
+            'messages':[{'role':'user', 'content':[{'type':'image','source':{'type':'base64','media_type':'image/jpeg','data':frame['image']}},
+                                                     {'type':'text','text':prompt}]}]}
+    request = urllib.request.Request('https://api.anthropic.com/v1/messages', json.dumps(body).encode(),
+                                     {'x-api-key':key,'anthropic-version':'2023-06-01','Content-Type':'application/json'})
+    try:
+        with urllib.request.urlopen(request, timeout=35) as response: result = json.load(response)
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        raise ValueError('Anthropic 请求失败，请检查网络、密钥和模型权限') from exc
+    outputs = [c.get('text','') for c in result.get('content',[]) if c.get('type') == 'text']
     try:
         return json.loads(''.join(outputs).strip().removeprefix('```json').removesuffix('```').strip())
     except (ValueError, TypeError):
@@ -193,6 +203,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.check('phone'); state.finish(); state.frame = None; self.reply(200, {'ok':True}); return
             if path == '/audio':
                 self.check('device'); wav = self.body(); text = transcribe(wav); task = state.begin(text); self.reply(200, {'task':task['id']}); return
+            if path == '/check':
+                self.check('device'); body=json.loads(self.body())
+                with state.lock:
+                    ok = bool(state.pending and secrets.compare_digest(state.pending['id'], str(body.get('id', ''))) and state.frame and state.pending_image == state.frame['image'] and time.monotonic() - state.frame['received'] <= MAX_FRAME_AGE)
+                self.reply(200, {'ok':ok}); return
             if path == '/result':
                 self.check('device'); body=json.loads(self.body()); state.result(str(body.get('id','')), body.get('ok') is True); self.reply(200, {'ok':True}); return
             self.reply(404, {'error':'不存在'})

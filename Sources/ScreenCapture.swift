@@ -58,7 +58,6 @@ final class ScreenCapture: NSObject, ObservableObject {
     func start(filter: SCContentFilter) async {
         do {
             let config = SCStreamConfiguration()
-            config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
             let next = SCStream(filter: filter, configuration: config, delegate: self)
             try next.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
             try await next.startCapture()
@@ -92,7 +91,9 @@ final class ScreenCapture: NSObject, ObservableObject {
         let image = input.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         guard let cg = context.createCGImage(image, from: image.extent),
               let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.65) else { return }
-        let bounds = UIScreen.main.bounds
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+              let screen = scene.windows.first?.screen else { return }
+        let bounds = screen.bounds
         let payload: [String: Any] = ["jpeg": jpeg.base64EncodedString(), "width": cg.width, "height": cg.height,
             "point_width": bounds.width, "point_height": bounds.height,
             "orientation": bounds.width > bounds.height ? "landscape" : "portrait", "timestamp": Date().timeIntervalSince1970]
