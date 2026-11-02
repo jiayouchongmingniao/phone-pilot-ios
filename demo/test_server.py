@@ -22,8 +22,8 @@ class StateTests(unittest.TestCase):
         self.state.add_frame(self.payload)
         self.state.begin('打开设置')
         frame = self.state.current_frame()
-        action = self.state.propose({'type':'tap','x':100,'y':200},frame)
-        with self.assertRaises(ValueError): self.state.propose({'type':'tap','x':1,'y':2},frame)
+        action = self.state.propose({'type':'tap','x':100,'y':200,'label':'搜索'},frame)
+        with self.assertRaises(ValueError): self.state.propose({'type':'tap','x':1,'y':2,'label':'搜索'},frame)
         self.state.result(action['id'], True)
         with self.assertRaises(ValueError): self.state.result(action['id'], True)
         self.assertIsNone(self.state.current_frame(after=frame['sequence']))
@@ -32,12 +32,19 @@ class StateTests(unittest.TestCase):
         frame = self.state.current_frame()
         self.payload['jpeg']=base64.b64encode(b'\xff\xd8different').decode()
         self.state.add_frame(self.payload)
-        with self.assertRaises(ValueError): self.state.propose({'type':'tap','x':1,'y':2},frame)
+        with self.assertRaises(ValueError): self.state.propose({'type':'tap','x':1,'y':2,'label':'搜索'},frame)
     def test_dangerous_and_invalid_actions_blocked(self):
         frame={'point_width':390,'point_height':844}
         for action in ({'type':'tap','x':float('nan'),'y':1}, {'type':'tap','x':400,'y':1},
-                       {'type':'key','key':'return'}, {'type':'send'}, {'type':'type','text':'你好'}):
+                       {'type':'key','key':'return'}, {'type':'send'}, {'type':'type','text':'你好'},
+                       {'type':'tap','x':1,'y':2,'label':'发送'}):
             with self.assertRaises(ValueError): server.validate_action(action,frame)
+    def test_send_requires_complete_bounded_details(self):
+        frame={'point_width':390,'point_height':844}
+        valid={'type':'send','x':300,'y':700,'recipient':'小明','text':'你好'}
+        self.assertEqual(server.validate_action(valid,frame)['recipient'],'小明')
+        for changes in ({'recipient':''}, {'text':'超'*20}, {'text':'一\n二'}, {'x':390}):
+            with self.assertRaises(ValueError): server.validate_action(dict(valid,**changes),frame)
     def test_no_key(self):
         with patch.dict('os.environ', {}, clear=True):
             with self.assertRaisesRegex(ValueError,'DASHSCOPE_API_KEY'): server.transcribe(b'RIFFtest')
@@ -61,7 +68,7 @@ class HTTPTests(unittest.TestCase):
             post('/frame', {'jpeg':jpeg,'width':390,'height':844,'point_width':390,'point_height':844},phone)
             with patch('server.transcribe', return_value='打开设置'):
                 post('/audio', b'RIFFtest', device)
-            with patch('server.decide', return_value={'type':'tap','x':100,'y':200}):
+            with patch('server.decide', return_value={'type':'tap','x':100,'y':200,'label':'搜索'}):
                 req=urllib.request.Request(root+'/next', headers={'Authorization':'Bearer '+device})
                 with urllib.request.urlopen(req, timeout=3) as response: action=json.load(response)['action']
             self.assertTrue(post('/check', {'id':action['id']}, device)['ok'])
