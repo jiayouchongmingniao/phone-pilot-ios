@@ -77,13 +77,13 @@ class ProviderTests(unittest.TestCase):
         return io.BytesIO(json.dumps(value).encode())
     @patch('server.urllib.request.urlopen')
     def test_qwen_wav_request(self, urlopen):
-        urlopen.return_value = self.response({'choices':[{'message':{'content':'打开设置'}}]})
+        urlopen.return_value = self.response({'output':{'text':'打开设置'}})
         with patch.dict('os.environ', {'DASHSCOPE_API_KEY':'test'}, clear=True):
             self.assertEqual(server.transcribe(b'RIFFexample'), '打开设置')
         request = urlopen.call_args.args[0]
         payload = json.loads(request.data)
-        self.assertEqual(payload['model'], 'qwen3-asr-flash')
-        self.assertTrue(payload['messages'][0]['content'][0]['input_audio']['data'].startswith('data:audio/wav;base64,'))
+        self.assertEqual(payload['model'], 'qwen-audio-3.1-asr-flash')
+        self.assertTrue(payload['input']['messages'][0]['content'][0]['input_audio']['data'].startswith('data:audio/wav;base64,'))
     @patch('server.urllib.request.urlopen')
     def test_anthropic_vision_request(self, urlopen):
         urlopen.return_value = self.response({'content':[{'type':'text','text':'{"type":"assist"}'}]})

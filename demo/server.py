@@ -133,14 +133,15 @@ def transcribe(wav):
         raise ValueError('录音格式无效')
     key = os.environ.get('DASHSCOPE_API_KEY')
     if not key: raise ValueError('Mac 未配置 DASHSCOPE_API_KEY')
-    endpoint = os.environ.get('DASHSCOPE_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1').rstrip('/')
-    body = {'model':'qwen3-asr-flash', 'messages':[{'role':'user','content':[{'type':'input_audio',
-            'input_audio':{'data':'data:audio/wav;base64,'+base64.b64encode(wav).decode()}}]}], 'stream':False}
-    request = urllib.request.Request(endpoint + '/chat/completions', json.dumps(body).encode(),
+    endpoint = os.environ.get('DASHSCOPE_BASE_URL', 'https://dashscope.aliyuncs.com/api/v1').rstrip('/')
+    body = {'model':'qwen-audio-3.1-asr-flash', 'input':{'messages':[{'role':'user','content':[{'type':'input_audio',
+            'input_audio':{'data':'data:audio/wav;base64,'+base64.b64encode(wav).decode()}}]}]},
+            'parameters':{'format':'wav','sample_rate':'16000'}}
+    request = urllib.request.Request(endpoint + '/services/aigc/multimodal-generation/generation', json.dumps(body).encode(),
         {'Authorization':'Bearer '+key,'Content-Type':'application/json'})
     try:
         with urllib.request.urlopen(request, timeout=35) as response: result=json.load(response)
-        text = result['choices'][0]['message']['content'].strip()
+        text = result['output']['text'].strip()
     except (urllib.error.URLError, TimeoutError, ValueError, KeyError, IndexError, TypeError) as exc:
         raise ValueError('Qwen 语音识别失败，请检查网络、密钥和区域') from exc
     if not text: raise ValueError('没有听清，请再说一次')
