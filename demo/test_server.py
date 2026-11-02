@@ -94,7 +94,7 @@ class HTTPTests(unittest.TestCase):
 class ProviderTests(unittest.TestCase):
     def response(self, value):
         return io.BytesIO(json.dumps(value).encode())
-    @patch('server.urllib.request.urlopen')
+    @patch('server.open_qwen')
     def test_qwen_wav_request(self, urlopen):
         urlopen.return_value = self.response({'output':{'text':'打开设置'}})
         with patch.dict('os.environ', {'DASHSCOPE_API_KEY':'test'}, clear=True):
@@ -103,6 +103,11 @@ class ProviderTests(unittest.TestCase):
         payload = json.loads(request.data)
         self.assertEqual(payload['model'], 'qwen-audio-3.1-asr-flash')
         self.assertTrue(payload['input']['messages'][0]['content'][0]['input_audio']['data'].startswith('data:audio/wav;base64,'))
+    def test_interface_binding_rejects_unsupported_platform(self):
+        request=urllib.request.Request('https://example.com/')
+        with patch.dict('os.environ', {'DASHSCOPE_INTERFACE':'en0'}, clear=True), patch('server.sys.platform','linux'):
+            with self.assertRaisesRegex(ValueError, '网络接口'):
+                server.open_qwen(request)
     @patch('server.urllib.request.urlopen')
     def test_anthropic_vision_request(self, urlopen):
         urlopen.return_value = self.response({'content':[{'type':'text','text':'{"type":"assist"}'}]})

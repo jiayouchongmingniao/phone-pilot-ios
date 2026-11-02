@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Local Phone Pilot coordinator. Run only on a trusted private LAN."""
 import base64
+import http.client
 import json
 import math
 import os
 import secrets
 import socket
+import sys
 import threading
 import time
 import urllib.error
@@ -152,6 +154,47 @@ def validate_action(action, frame, task_text=""):
     raise ValueError('不支持此操作；发送、付款和删除需手动完成')
 
 
+def open_qwen(request, timeout=35):
+    """Optionally bind just the Qwen TLS connection to a macOS network interface."""
+    interface = os.environ.get('DASHSCOPE_INTERFACE')
+    if not interface:
+        return urllib.request.urlopen(request, timeout=timeout)
+    if sys.platform != 'darwin' or not hasattr(socket, 'if_nametoindex'):
+        raise ValueError('当前系统不支持指定网络接口')
+    try:
+        index = socket.if_nametoindex(interface)
+    except OSError as exc:
+        raise ValueError('Qwen 网络接口不存在') from exc
+
+    def connect(address, connect_timeout, source_address=None):
+        last = None
+        for family, socktype, proto, _, sockaddr in socket.getaddrinfo(
+                address[0], address[1], socket.AF_INET, socket.SOCK_STREAM):
+            sock = socket.socket(family, socktype, proto)
+            try:
+                sock.settimeout(connect_timeout)
+                # Darwin's IP_BOUND_IF; limits this socket to the configured interface.
+                sock.setsockopt(socket.IPPROTO_IP, 25, index)
+                if source_address: sock.bind(source_address)
+                sock.connect(sockaddr)
+                return sock
+            except OSError as exc:
+                last = exc
+                sock.close()
+        raise last or OSError('无法解析 Qwen 地址')
+
+    class BoundConnection(http.client.HTTPSConnection):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._create_connection = connect
+
+    class BoundHTTPSHandler(urllib.request.HTTPSHandler):
+        def https_open(self, req):
+            return self.do_open(BoundConnection, req, context=self._context)
+
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), BoundHTTPSHandler()).open(request, timeout=timeout)
+
+
 def transcribe(wav):
     if not wav.startswith(b'RIFF') or len(wav) > 400000:
         raise ValueError('录音格式无效')
@@ -164,7 +207,7 @@ def transcribe(wav):
     request = urllib.request.Request(endpoint + '/services/aigc/multimodal-generation/generation', json.dumps(body).encode(),
         {'Authorization':'Bearer '+key,'Content-Type':'application/json'})
     try:
-        with urllib.request.urlopen(request, timeout=35) as response: result=json.load(response)
+        with open_qwen(request, timeout=35) as response: result=json.load(response)
         text = result['output']['text'].strip()
     except (urllib.error.URLError, TimeoutError, ValueError, KeyError, IndexError, TypeError) as exc:
         raise ValueError('Qwen 语音识别失败，请检查网络、密钥和区域') from exc

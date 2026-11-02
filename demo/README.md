@@ -8,11 +8,11 @@
 cd /Users/pom/Code/yaykit/phone-pilot-ios
 read -s 'ANTHROPIC_API_KEY?Anthropic API key: '; export ANTHROPIC_API_KEY; echo
 read -s 'DASHSCOPE_API_KEY?DashScope API key: '; export DASHSCOPE_API_KEY; echo
-export HTTPS_PROXY=http://192.168.10.171:16005
+source "$HOME/Library/Application Support/PhonePilot/local.env"
 python3 demo/server.py --bind "$(ipconfig getifaddr en0)"
 ```
 
-默认使用阿里云北京地域的 `dashscope.aliyuncs.com`。目前此 Mac 对该旧域名的 TLS 握手超时。若使用北京业务空间的专属域名，在启动服务前运行 `export DASHSCOPE_BASE_URL=https://<WorkspaceId>.cn-beijing.maas.aliyuncs.com/api/v1`（将占位符替换为业务空间 ID）；密钥和服务地域必须一致。该专属域名仍需实测。服务输出 Mac 地址及配对码；在 iPhone 和圆屏各输入一次。每次重启服务要重新配对。
+默认使用阿里云北京地域的 `dashscope.aliyuncs.com`。目前此 Mac 对该旧域名的 TLS 握手超时。若使用北京业务空间的专属域名，在启动服务前运行 `export DASHSCOPE_BASE_URL=https://<WorkspaceId>.cn-beijing.maas.aliyuncs.com/api/v1`（将占位符替换为业务空间 ID）；密钥和服务地域必须一致。本机配置还将 Qwen 请求绑定到 `en0`，并使用系统 CA 证书；仅验证了网络和 TLS，还需新密钥做实际识别。服务输出 Mac 地址及配对码；在 iPhone 和圆屏各输入一次。每次重启服务要重新配对。
 
 打开 iPhone App，输入地址和配对码，选择整个屏幕。圆屏填写相同地址和配对码并连接。圆屏按住侧键说话，每次点击都需要在圆屏确认，确认前查看 iPhone 屏幕。发送确认和中文拼音输入均需要最新固件与协调服务，尚未经真机验证；不能确认候选词或画面变化时应停止。用 Ctrl-C 停止 Mac 服务。
 
