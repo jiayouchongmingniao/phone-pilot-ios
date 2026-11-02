@@ -1,0 +1,99 @@
+# Builds the iPhone app on GitHub's Apple-silicon runners with Xcode 27 (the dev Mac is Intel and cannot run it).
+# - Every push: compile without signing, to catch errors fast.
+# - Run by hand with "TestFlight" ticked: archive, sign automatically with an App Store Connect API key, upload to
+#   TestFlight. Needs the repository secrets in docs/ci.md.
+name: iOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: 签名并上传到 TestFlight
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 编译（不签名）
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode 版本
+        run: xcodebuild -version
+      - name: 生成工程（XcodeGen）
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: 编译
+        shell: bash
+        run: |
+          xcodebuild build \
+            -project PhonePilotEyes.xcodeproj -scheme PhonePilotEyes -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -n 60
+
+  testflight:
+    name: 签名并上传 TestFlight
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.testflight
+    runs-on: xcode-27
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 检查密钥
+        shell: bash
+        run: |
+          for v in ASC_KEY_ID ASC_ISSUER_ID APPLE_TEAM_ID; do
+            [ -n "${!v}" ] || { echo "缺少仓库密钥 $v（见 docs/ci.md）"; exit 1; }
+          done
+      - name: 写入 API 密钥文件
+        shell: bash
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          [ -n "$ASC_KEY_P8" ] || { echo "缺少仓库密钥 ASC_KEY_P8（见 docs/ci.md）"; exit 1; }
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          chmod 600 "$KEY"
+          echo "ASC_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+      - name: 生成工程（XcodeGen）
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: 归档（自动签名）
+        shell: bash
+        run: |
+          xcodebuild archive \
+            -project PhonePilotEyes.xcodeproj -scheme PhonePilotEyes -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/PhonePilotEyes.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" 2>&1 | tail -n 60
+      - name: 导出并上传
+        shell: bash
+        run: |
+          sed "s/__TEAM_ID__/$APPLE_TEAM_ID/" ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/PhonePilotEyes.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tail -n 60
+      - name: 删除密钥文件
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8
