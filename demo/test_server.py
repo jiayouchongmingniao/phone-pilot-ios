@@ -45,6 +45,18 @@ class StateTests(unittest.TestCase):
         self.assertEqual(server.validate_action(valid,frame)['recipient'],'小明')
         for changes in ({'recipient':''}, {'text':'超'*20}, {'text':'一\n二'}, {'x':390}):
             with self.assertRaises(ValueError): server.validate_action(dict(valid,**changes),frame)
+    def test_chinese_pinyin_is_limited_to_requested_text(self):
+        frame={'point_width':390,'point_height':844}
+        action={'type':'type_chinese','target':'你好','pinyin':'nihao'}
+        self.assertEqual(server.validate_action(action,frame,'输入你好')['text'],'nihao')
+        with self.assertRaises(ValueError): server.validate_action(action,frame,'输入别的')
+        with self.assertRaises(ValueError): server.validate_action(dict(action,pinyin='ni hao'),frame,'输入你好')
+    def test_task_can_finish_at_step_limit(self):
+        self.state.add_frame(self.payload); self.state.begin('test')
+        self.state.steps = server.MAX_STEPS
+        frame = self.state.current_frame()
+        with self.assertRaises(ValueError): self.state.propose({'type':'tap','x':1,'y':2,'label':'搜索'},frame)
+        self.assertEqual(self.state.propose({'type':'done'},frame)['type'],'done')
     def test_no_key(self):
         with patch.dict('os.environ', {}, clear=True):
             with self.assertRaisesRegex(ValueError,'DASHSCOPE_API_KEY'): server.transcribe(b'RIFFtest')
