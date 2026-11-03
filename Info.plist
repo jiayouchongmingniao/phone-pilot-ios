@@ -11,7 +11,7 @@
 <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
 <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
 <key>LSRequiresIPhoneOS</key><true/>
-<key>NSLocalNetworkUsageDescription</key><string>连接同一 Wi-Fi 上的 Mac，发送授权的屏幕画面。</string>
+<key>NSLocalNetworkUsageDescription</key><string>连接同一 Wi-Fi 上的设备，验证共享屏幕与局域网通信。</string>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 <key>UIBackgroundModes</key><array><string>screen-capture</string></array>
 <key>UILaunchScreen</key><dict/>

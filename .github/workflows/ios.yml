@@ -33,6 +33,7 @@ jobs:
       - name: 编译
         shell: bash
         run: |
+          set -o pipefail
           xcodebuild build \
             -project PhonePilotEyes.xcodeproj -scheme PhonePilotEyes -configuration Release \
             -destination 'generic/platform=iOS' \
@@ -72,6 +73,7 @@ jobs:
       - name: 归档（自动签名）
         shell: bash
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project PhonePilotEyes.xcodeproj -scheme PhonePilotEyes -configuration Release \
             -destination 'generic/platform=iOS' \

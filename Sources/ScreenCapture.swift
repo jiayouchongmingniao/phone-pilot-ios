@@ -11,6 +11,7 @@ final class ScreenCapture: NSObject, ObservableObject {
     @Published var running = false
     @Published var connecting = false
     @Published var sent = 0
+    @Published var probeFrameTime: Date?
 
     private let picker = SCContentSharingPicker.shared
     private let context = CIContext()
@@ -21,6 +22,7 @@ final class ScreenCapture: NSObject, ObservableObject {
     private var uploading = false
     private var lastFrame = Date.distantPast
     private var generation = UUID()
+    private var probeOnly = false
 
     override init() {
         super.init()
@@ -32,6 +34,7 @@ final class ScreenCapture: NSObject, ObservableObject {
               code.count == 6, code.allSatisfy(\.isNumber) else {
             error = "请输入 Mac 的 HTTP 地址和 6 位配对码"; return
         }
+        probeOnly = false
         connecting = true; error = nil; status = "正在连接 Mac"
         do {
             var request = URLRequest(url: url.appendingPathComponent("pair"))
@@ -43,16 +46,27 @@ final class ScreenCapture: NSObject, ObservableObject {
                   let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let newToken = json["token"] as? String else { throw CaptureError.pairing }
             token = newToken; baseURL = url
-            guard let observer = pickerObserver else { throw CaptureError.pairing }
-            picker.add(observer); picker.isActive = true
-            var configuration = SCContentSharingPickerConfiguration()
-            configuration.showsMicrophoneControl = false
-            picker.defaultConfiguration = configuration
-            status = "请选择整个屏幕"
-            picker.present()
+            presentPicker()
         } catch {
             connecting = false; self.error = error.localizedDescription; status = "连接失败"
         }
+    }
+
+    func startProbe() {
+        guard !running && !connecting else { return }
+        baseURL = nil; token = ""; probeOnly = true; sent = 0; probeFrameTime = nil
+        connecting = true; error = nil
+        presentPicker()
+    }
+
+    private func presentPicker() {
+        guard let observer = pickerObserver else { connecting = false; return }
+        picker.add(observer); picker.isActive = true
+        var configuration = SCContentSharingPickerConfiguration()
+        configuration.showsMicrophoneControl = false
+        picker.defaultConfiguration = configuration
+        status = "请选择整个屏幕"
+        picker.present()
     }
 
     func start(filter: SCContentFilter) async {
@@ -86,6 +100,12 @@ final class ScreenCapture: NSObject, ObservableObject {
     }
 
     private func send(_ buffer: CMSampleBuffer) {
+        if probeOnly {
+            guard running, Date().timeIntervalSince(lastFrame) >= 1,
+                  CMSampleBufferGetImageBuffer(buffer) != nil else { return }
+            lastFrame = Date(); probeFrameTime = lastFrame; sent += 1
+            return
+        }
         guard running, !uploading, Date().timeIntervalSince(lastFrame) >= 1,
               let pixel = CMSampleBufferGetImageBuffer(buffer), let url = baseURL else { return }
         let input = CIImage(cvPixelBuffer: pixel)

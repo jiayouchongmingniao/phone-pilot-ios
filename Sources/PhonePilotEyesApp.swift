@@ -13,6 +13,9 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("开发验证") {
+                    NavigationLink("iPhone 局域网后台探针") { LocalProbeView() }
+                }
                 Section("Mac 协调端") {
                     TextField("例如 http://192.168.1.2:8788", text: $address)
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
