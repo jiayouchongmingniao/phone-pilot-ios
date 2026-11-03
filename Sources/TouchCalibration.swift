@@ -1,6 +1,12 @@
 import SwiftUI
 import UIKit
 
+enum CalibrationTiming {
+    // Mac permits only within 3s of accepting moved, then receives the point
+    // within 2s. That moved event precedes this phone's local arm.
+    static let touchWindow: TimeInterval = 5
+}
+
 struct CalibrationReply: Decodable, Sendable {
     let id: String?
     let phase: String?
@@ -161,7 +167,7 @@ private final class TouchCalibrationSession: ObservableObject {
         guard running, active, visible, geometryOK, capture.running,
               let arm, point.id == arm.id, point.id == id,
               point.page == arm.page, point.probe == arm.probe,
-              ProcessInfo.processInfo.systemUptime - arm.uptime <= 2 else { return }
+              ProcessInfo.processInfo.systemUptime - arm.uptime <= CalibrationTiming.touchWindow else { return }
         self.point = point
         lastTouchType = point.touchType
     }
@@ -195,7 +201,7 @@ private final class TouchCalibrationSession: ObservableObject {
               UIApplication.shared.applicationState == .active else {
             throw CalibrationFailure(message: "校准页面或屏幕共享已不可用。")
         }
-        if let arm, point == nil, ProcessInfo.processInfo.systemUptime - arm.uptime > 2 {
+        if let arm, point == nil, ProcessInfo.processInfo.systemUptime - arm.uptime > CalibrationTiming.touchWindow {
             throw CalibrationFailure(message: "本次点击等待超时，校准已停止。")
         }
     }
@@ -415,7 +421,7 @@ private final class CalibrationSurface: UIView {
         guard touches.count == 1, activeTouches.count == 1, let touch = touches.first,
               !hasOtherActiveTouch(in: event, excluding: touch),
               let point = screenPoint(touch), touch.timestamp >= armed.uptime,
-              touch.timestamp - armed.uptime <= 2 else {
+              touch.timestamp - armed.uptime <= CalibrationTiming.touchWindow else {
             reject("检测到多点或迟到触摸，校准已停止。")
             return
         }
@@ -447,7 +453,8 @@ private final class CalibrationSurface: UIView {
         self.candidate = nil
         guard activeTouches.count == 1, !hasOtherActiveTouch(in: event, excluding: touch),
               let point = screenPoint(touch),
-              touch.timestamp >= candidate.arm.uptime, touch.timestamp - candidate.arm.uptime <= 2,
+              touch.timestamp >= candidate.arm.uptime,
+              touch.timestamp - candidate.arm.uptime <= CalibrationTiming.touchWindow,
               hypot(point.x - candidate.start.x, point.y - candidate.start.y) <= 4,
               point.x >= 0, point.x < 390, point.y >= 0, point.y < 844 else {
             reject("点击位置或持续时间无效，校准已停止。")

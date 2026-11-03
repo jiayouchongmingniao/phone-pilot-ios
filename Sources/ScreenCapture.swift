@@ -98,6 +98,7 @@ final class ScreenCapture: NSObject, ObservableObject {
             throw CalibrationFailure(message: "请先连接 Mac 并共享整个屏幕。")
         }
         var payload: [String: Any] = ["op": op, "page": page, "geometry": [390, 844, "portrait"]]
+        if op == "begin" { payload["touch_window_ms"] = Int(CalibrationTiming.touchWindow * 1000) }
         if let id { payload["id"] = id }
         if let probe { payload["probe"] = probe }
         if let point {
