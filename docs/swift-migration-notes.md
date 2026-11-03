@@ -24,6 +24,13 @@ swiftc -swift-version 6 tests/PinyinProbe.swift -o /tmp/phone-pilot-pinyin-probe
 
 ## 其他部分
 
-- 坐标拟合、指针图像定位和画面差异检查仍由另一会话修改，先等待真实设备验证并冻结样本，再建立 Python/Swift 对照，避免移植不稳定算法。
+- 坐标拟合做了隔离的 Swift 概念验证：与当前工作区 `pointer.py` 比较，一组正常数据和三组拒绝数据结果一致。它只在合成样本上测试，不进入 iOS App，也不能作为真实指针验收。复现方式：
+
+  ```sh
+  swiftc -parse-as-library -swift-version 6 tests/CalibrationProbe.swift -o /tmp/phone-pilot-calibration-probe
+  /Users/pom/Code/yaykit/phone-pilot-ios/demo/.venv/bin/python tests/compare_calibration.py /tmp/phone-pilot-calibration-probe /Users/pom/Code/yaykit/phone-pilot-ios/demo/pointer.py
+  ```
+
+- 指针图像定位和画面差异检查仍由另一会话修改，先等待真实设备验证并冻结样本，再建立 Python/Swift 对照，避免移植不稳定算法。
 - iOS 可以用 URLSession 调用模型，用 Keychain 保存密钥；本分支只验证无密钥 HTTPS，未实现或验证任何供应商请求。
 - 本机只有 Command Line Tools、没有 iOS SDK；不能在此编译 iPhone App。现有 GitHub Actions 使用 iOS 27 SDK 的云端机器进行无签名构建。加入 `pipefail` 让 `xcodebuild` 失败不会被末尾的 `tail` 掩盖。TestFlight 的签名、权限和后台行为仍需另行验证。
