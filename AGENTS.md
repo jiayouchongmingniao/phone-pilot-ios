@@ -21,7 +21,7 @@ iPhone 上的 app 把屏幕画面发出来，让「判断」看得见当前界�
 
 | 仓库 | 位置 | 是什么 |
 |---|---|---|
-| `phone-pilot` | 本机 `/Users/pom/Code/yaykit/phone-pilot`（只在本地，没有远程） | 圆屏上的应用（ESP-IDF 5.5.5，Yaykit 开发包 1.3） |
+| `phone-pilot` | 本机 `/Users/pom/Code/yaykit/phone-pilot`（只在本地，没有远程） | 圆屏上的应用（ESP-IDF 5.5.5，Tikpal 开发包 1.5） |
 | `phone-pilot-ios` | 本机 `/Users/pom/Code/yaykit/phone-pilot-ios`，GitHub `jiayouchongmingniao/phone-pilot-ios`（**公开**） | iPhone 端 app，现在只是占位 |
 
 ## 2. 已经验证过的（真机，iPhone 16e）
