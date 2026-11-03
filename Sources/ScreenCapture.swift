@@ -21,6 +21,12 @@ final class ScreenCapture: NSObject, ObservableObject {
     private var uploading = false
     private var lastFrame = Date.distantPast
     private var generation = UUID()
+    private let calibrationHTTP: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 2
+        configuration.timeoutIntervalForResource = 2
+        return URLSession(configuration: configuration)
+    }()
 
     override init() {
         super.init()
@@ -83,6 +89,33 @@ final class ScreenCapture: NSObject, ObservableObject {
             _ = try? await URLSession.shared.data(for: request)
         }
         status = "已停止共享"
+    }
+
+    /// The phone credential stays here; the calibration page receives only protocol state.
+    func calibrationRequest(op: String, page: String, id: String? = nil,
+                            probe: String? = nil, point: CalibrationPoint? = nil) async throws -> CalibrationReply {
+        guard let baseURL, !token.isEmpty, running || op == "cancel" else {
+            throw CalibrationFailure(message: "请先连接 Mac 并共享整个屏幕。")
+        }
+        var payload: [String: Any] = ["op": op, "page": page, "geometry": [390, 844, "portrait"]]
+        if let id { payload["id"] = id }
+        if let probe { payload["probe"] = probe }
+        if let point {
+            payload["x"] = point.x; payload["y"] = point.y
+            payload["touch_type"] = point.touchType
+        }
+        var request = URLRequest(url: baseURL.appendingPathComponent("calibration"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 2
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (data, response) = try await calibrationHTTP.data(for: request)
+        let reply = try JSONDecoder().decode(CalibrationReply.self, from: data)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw CalibrationFailure(message: reply.error ?? "Mac 未接受校准请求。")
+        }
+        return reply
     }
 
     private func send(_ buffer: CMSampleBuffer) {
