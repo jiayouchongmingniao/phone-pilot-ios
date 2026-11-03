@@ -87,6 +87,7 @@ jobs:
       - name: 导出并上传
         shell: bash
         run: |
+          set -o pipefail
           sed "s/__TEAM_ID__/$APPLE_TEAM_ID/" ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/PhonePilotEyes.xcarchive" \
