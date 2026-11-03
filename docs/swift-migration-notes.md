@@ -19,7 +19,7 @@
 
 ```sh
 swiftc -swift-version 6 tests/PinyinProbe.swift -o /tmp/phone-pilot-pinyin-probe
-/Users/pom/Code/yaykit/phone-pilot-ios/demo/.venv/bin/python tests/compare_pinyin.py /tmp/phone-pilot-pinyin-probe
+python tests/compare_pinyin.py /tmp/phone-pilot-pinyin-probe
 ```
 
 ## 其他部分
@@ -28,7 +28,7 @@ swiftc -swift-version 6 tests/PinyinProbe.swift -o /tmp/phone-pilot-pinyin-probe
 
   ```sh
   swiftc -parse-as-library -swift-version 6 tests/CalibrationProbe.swift -o /tmp/phone-pilot-calibration-probe
-  /Users/pom/Code/yaykit/phone-pilot-ios/demo/.venv/bin/python tests/compare_calibration.py /tmp/phone-pilot-calibration-probe /Users/pom/Code/yaykit/phone-pilot-ios/demo/pointer.py
+  python tests/compare_calibration.py /tmp/phone-pilot-calibration-probe /path/to/phone-pilot-ios/demo/pointer.py
   ```
 
 - 指针图像定位和画面差异检查仍由另一会话修改，先等待真实设备验证并冻结样本，再建立 Python/Swift 对照，避免移植不稳定算法。
