@@ -298,6 +298,41 @@ private struct CalibrationSurfaceView: UIViewRepresentable {
     func updateUIView(_ uiView: CalibrationSurface, context: Context) {}
 }
 
+// Observe the whole window, including the SwiftUI controls above the measurement view.
+// This recognizer never recognizes or prevents another gesture; it only counts held touches.
+@MainActor
+private final class CalibrationTouchTracker: UIGestureRecognizer {
+    private var touches = Set<ObjectIdentifier>()
+    var isIdle: Bool { touches.isEmpty }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        touches.forEach { self.touches.insert(ObjectIdentifier($0)) }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {}
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        finish(touches)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        finish(touches)
+    }
+
+    private func finish(_ touches: Set<UITouch>) {
+        touches.forEach { self.touches.remove(ObjectIdentifier($0)) }
+        if self.touches.isEmpty { state = .failed }
+    }
+
+    override func reset() {
+        super.reset()
+        touches.removeAll()
+    }
+
+    override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+    override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+}
+
 @MainActor
 private final class CalibrationSurface: UIView {
     weak var session: TouchCalibrationSession?
@@ -306,6 +341,8 @@ private final class CalibrationSurface: UIView {
     private var consumed = false
     private var candidate: (touch: ObjectIdentifier, arm: CalibrationArm, start: CGPoint, type: String)?
     private var reportedGeometry: Bool?
+    private weak var monitoredWindow: UIWindow?
+    private var touchTracker: CalibrationTouchTracker?
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -314,6 +351,20 @@ private final class CalibrationSurface: UIView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        if monitoredWindow !== window {
+            if let touchTracker { monitoredWindow?.removeGestureRecognizer(touchTracker) }
+            touchTracker = nil
+            monitoredWindow = window
+            if let window {
+                let tracker = CalibrationTouchTracker(target: nil, action: nil)
+                tracker.cancelsTouchesInView = false
+                tracker.delaysTouchesBegan = false
+                tracker.delaysTouchesEnded = false
+                tracker.requiresExclusiveTouchType = false
+                window.addGestureRecognizer(tracker)
+                touchTracker = tracker
+            }
+        }
         reportGeometry()
     }
 
@@ -330,7 +381,8 @@ private final class CalibrationSurface: UIView {
     }
 
     func arm(_ arm: CalibrationArm) -> Bool {
-        guard activeTouches.isEmpty, candidate == nil, reportedGeometry == true else { return false }
+        guard touchTracker?.isIdle == true, activeTouches.isEmpty, candidate == nil,
+              reportedGeometry == true else { return false }
         armed = arm
         return true
     }
