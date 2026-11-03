@@ -195,7 +195,7 @@ private final class TouchCalibrationSession: ObservableObject {
               UIApplication.shared.applicationState == .active else {
             throw CalibrationFailure(message: "校准页面或屏幕共享已不可用。")
         }
-        if let arm, ProcessInfo.processInfo.systemUptime - arm.uptime > 2 {
+        if let arm, point == nil, ProcessInfo.processInfo.systemUptime - arm.uptime > 2 {
             throw CalibrationFailure(message: "本次点击等待超时，校准已停止。")
         }
     }
