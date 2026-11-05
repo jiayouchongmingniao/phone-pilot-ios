@@ -330,6 +330,15 @@ class InstallCi(Base):
         self.assertEqual(stat.S_IMODE(os.stat(os.path.join(self.state, 'iCTRL-signed.ipa')).st_mode), 0o600)
         self.assertIsNone(self.secret_input)
 
+    def test_names_with_dot_slash_prefix_like_tar_of_a_directory(self):
+        # 工作流用 tar -C out . 打包，成员名是 ./iCTRL-signed.ipa。
+        self.members = {'./iCTRLUITests-Runner-signed.ipa': b'runner', './iCTRL-signed.ipa': b'app',
+                        './dev-cert.p12': b'p12-bytes'}
+        code, output = self.install()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.installed, [('iCTRLUITests-Runner-signed.ipa', b'runner'), ('iCTRL-signed.ipa', b'app')])
+        self.assertEqual(self.secret_input, ('ICTRL_DEV_P12_B64', base64.b64encode(b'p12-bytes')))
+
     def test_new_certificate_goes_to_repo_secret_and_leaves_no_file(self):
         self.members['dev-cert.p12'] = b'p12-bytes'
         self.assertEqual(self.install()[0], 0)
@@ -339,6 +348,7 @@ class InstallCi(Base):
 
     def test_unknown_archive_paths_are_ignored(self):
         self.members['../../evil.ipa'] = b'evil'
+        self.members['sub/iCTRL-signed.ipa'] = b'nested'
         self.assertEqual(self.install()[0], 0)
         self.assertEqual(len(self.installed), 2)
         self.assertFalse(os.path.exists(os.path.join(self.tmp.name, 'evil.ipa')))

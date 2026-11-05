@@ -331,12 +331,12 @@ def cmd_install_ci(args):
              '-out', bundle, '-pass', 'file:' + args.password_file])
         installed = []
         with tarfile.open(bundle) as archive:
-            # 只取已知文件名，不解压任意路径。
+            # 只取已知文件名，不解压任意路径。tar -C dir . 打包的成员名带 ./ 前缀。
+            members = {m.name[2:] if m.name.startswith('./') else m.name: m for m in archive.getmembers() if m.isfile()}
             for name in ('iCTRLUITests-Runner-signed.ipa', 'iCTRL-signed.ipa', CI_P12_NAME):
-                try:
-                    member = archive.extractfile(name)
-                except KeyError:
+                if name not in members:
                     continue
+                member = archive.extractfile(members[name])
                 path = state_path(name)
                 descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
                 with os.fdopen(descriptor, 'wb') as handle:
