@@ -46,7 +46,7 @@
 | `.github/workflows/ictrl.yml`、`demo/ictrl_setup.py` | 在 GitHub Actions 里编译、签名 runner，再安装到手机 |
 | `demo/ictrl_driver.py`、`demo/ictrl_probe.py` | Mac 上调试 runner 的命令行工具，真机验收也用它 |
 | [demo/README.md](demo/README.md)、`demo/server.py` | 早期经过 Mac 的路径，可选走 iCTRL，默认走录屏和 USB 键鼠 |
-| `Sources/`、`project.yml`、[docs/ci.md](docs/ci.md) | iPhone 端 App（屏幕共享），用 XcodeGen 生成工程，在云端编译并发到 TestFlight，最低 iOS 27 |
+| `Sources/`、`project.yml`、[docs/ci.md](docs/ci.md) | iPhone 端 App（屏幕共享），用 XcodeGen 生成工程，在云端编译并发到 TestFlight，最低 iOS 27，圆屏直连用不到 |
 | `demo/third_party/` | 第三方代码和许可证，来源见其中的 README |
 
 `demo/` 的测试这样运行，需要先按 `demo/requirements.txt` 装好依赖：
@@ -54,6 +54,12 @@
 ```zsh
 cd demo && python3 -m unittest discover -s . -p 'test_*.py'
 ```
+
+## 能给谁用
+
+iCTRL runner 基本不可能通过 TestFlight 分发：它要开发签名、开发者模式和 Developer Disk Image。目前的安装方式只适合开发者或少量内测，普通用户要换手机端方案。
+
+runner 支持 iOS 16 及以上，目前只实测过 iPhone 16e、iOS 27.2。微信流程用了按这台手机屏幕尺寸写的坐标，其他尺寸的 iPhone 可能要改。细节见 [分发和系统版本](demo/ictrl-integration.md#分发和系统版本)。
 
 ## 注意
 
