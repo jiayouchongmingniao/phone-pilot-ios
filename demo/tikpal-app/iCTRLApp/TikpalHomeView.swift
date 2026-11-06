@@ -1,17 +1,22 @@
 import SwiftUI
 import UIKit
 
-/// The one screen most people need: after a reboot, one button brings everything back. The upstream screens stay
-/// behind the gear, for the first pairing file and for looking closer.
+/// The one screen most people need: one button starts the service, whatever a reboot took away, and the same button
+/// stops it. The upstream screens stay behind the gear, for the first pairing file and for looking closer.
 struct TikpalHomeView: View {
     private enum Step: Equatable {
-        case idle, tunnel, mounting, starting
+        case idle, tunnel, mounting, starting, stopping, confirmStop
         case failed(String)
     }
 
     private static let runnerURL = URL(string: "ictrl://start?callback=ictrl-app://started")!
+    /// When this app isn't paired with the runner. Any app can open it, so the runner only posts a confirmation.
+    private static let runnerStopURL = URL(string: "ictrl://stop?callback=ictrl-app://stopped")!
+    /// The runner normally calls back well before this. Past it the button comes back, so a retry is possible.
+    private static let startTimeoutSeconds: UInt64 = 20
 
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var runnerAdmin: RunnerAdmin
     @StateObject private var mounter = DDIMounter()
     @StateObject private var runner = RunnerStatus(port: 8200)
     @State private var step = Step.idle
@@ -19,39 +24,58 @@ struct TikpalHomeView: View {
     @State private var hasPairingFile = PairingFileStore.exists
     @State private var showSetup = false
 
-    private var busy: Bool { step == .tunnel || step == .mounting || step == .starting }
-    private var ready: Bool { mounted && runner.isRunning }
+    private var probing: Bool {
+        switch runner.state {
+        case .unknown, .checking: return true
+        case .running, .stopped: return false
+        }
+    }
+
+    private var busy: Bool {
+        switch step {
+        case .tunnel, .mounting, .stopping: return true
+        case .starting: return !runner.isRunning
+        case .idle, .confirmStop, .failed: return probing
+        }
+    }
 
     private var message: String {
         switch step {
         case .tunnel: return "正在接通"
         case .mounting: return "正在准备手机"
-        case .starting: return "正在启动"
-        case .failed(let why): return why
-        case .idle: break
+        case .starting where !runner.isRunning: return "正在启动"
+        case .stopping: return "正在停止"
+        case .confirmStop where runner.isRunning: return "请长按手机上的通知，确认停止"
+        case .failed(let why) where !runner.isRunning: return why
+        default: break
         }
-        if ready { return "已就绪，可以用圆屏了" }
+        if probing { return "正在检查" }
+        if runner.isRunning { return "已就绪，可以用圆屏了" }
         if !hasPairingFile { return "还缺配对文件，只需设置一次" }
-        return mounted ? "服务没有运行" : "手机重启过，需要恢复一下"
+        return mounted ? "服务没有运行" : "手机重启过，点“开始服务”恢复"
     }
 
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-            Image(systemName: ready ? "checkmark.circle.fill" : "arrow.clockwise.circle.fill")
+            Image(systemName: runner.isRunning ? "checkmark.circle.fill" : "power.circle.fill")
                 .font(.system(size: 72))
-                .foregroundColor(ready ? .green : .orange)
+                .foregroundColor(runner.isRunning ? .green : .orange)
             Text(message)
                 .font(.title3)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
             if busy {
                 ProgressView()
+            } else if runner.isRunning {
+                Button("停止服务", role: .destructive) { Task { await stop() } }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
             } else if !hasPairingFile {
                 Button("导入配对文件") { showSetup = true }
                     .buttonStyle(.borderedProminent)
-            } else if !ready {
-                Button("恢复") { Task { await restore() } }
+            } else {
+                Button("开始服务") { Task { await start() } }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
             }
@@ -77,7 +101,9 @@ struct TikpalHomeView: View {
             guard url.scheme == "ictrl-app" else { return }
             Task {
                 await runner.check()
-                step = runner.isRunning ? .idle : .failed("服务没有启动，请再试一次")
+                if url.host == "started" {
+                    step = runner.isRunning ? .idle : .failed("服务没有启动，请再试一次")
+                }
             }
         }
         .sheet(isPresented: $showSetup, onDismiss: refresh) { DDIMountView() }
@@ -89,7 +115,7 @@ struct TikpalHomeView: View {
         runner.startPolling()
     }
 
-    private func restore() async {
+    private func start() async {
         if !DeveloperDiskImage.status().isMounted {
             guard DeveloperDiskImageStore.isComplete else {
                 step = .failed("缺少系统镜像，请到设置里下载")
@@ -115,6 +141,23 @@ struct TikpalHomeView: View {
         step = .starting
         UIApplication.shared.open(Self.runnerURL) { opened in
             if !opened { step = .failed("没有找到 Tikpal Runner，请重新安装") }
+        }
+        try? await Task.sleep(nanoseconds: Self.startTimeoutSeconds * 1_000_000_000)
+        if step == .starting && !runner.isRunning {
+            step = .failed("服务没有启动，请再试一次")
+        }
+    }
+
+    private func stop() async {
+        step = .stopping
+        if await runnerAdmin.stopRunner() {
+            // Give the runner a moment to close its port, or the probe still finds it.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await runner.check()
+            step = .idle
+        } else {
+            step = .confirmStop
+            await UIApplication.shared.open(Self.runnerStopURL)
         }
     }
 }
