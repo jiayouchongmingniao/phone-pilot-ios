@@ -5,13 +5,12 @@ import UIKit
 /// stops it. The upstream screens stay behind the gear, for the first pairing file and for looking closer.
 struct TikpalHomeView: View {
     private enum Step: Equatable {
-        case idle, tunnel, mounting, starting, stopping, confirmStop
+        case idle, tunnel, mounting, starting, stopping, allowing
         case failed(String)
+        case notStopped(String)
     }
 
     private static let runnerURL = URL(string: "ictrl://start?callback=ictrl-app://started")!
-    /// When this app isn't paired with the runner. Any app can open it, so the runner only posts a confirmation.
-    private static let runnerStopURL = URL(string: "ictrl://stop?callback=ictrl-app://stopped")!
     /// The runner normally calls back well before this. Past it the button comes back, so a retry is possible.
     private static let startTimeoutSeconds: UInt64 = 20
 
@@ -33,9 +32,9 @@ struct TikpalHomeView: View {
 
     private var busy: Bool {
         switch step {
-        case .tunnel, .mounting, .stopping: return true
+        case .tunnel, .mounting, .stopping, .allowing: return true
         case .starting: return !runner.isRunning
-        case .idle, .confirmStop, .failed: return probing
+        case .idle, .failed, .notStopped: return probing
         }
     }
 
@@ -45,7 +44,8 @@ struct TikpalHomeView: View {
         case .mounting: return "正在准备手机"
         case .starting where !runner.isRunning: return "正在启动"
         case .stopping: return "正在停止"
-        case .confirmStop where runner.isRunning: return "请长按手机上的通知，确认停止"
+        case .allowing: return "请长按手机上的授权通知，点“允许”\n只需一次，以后一点就停"
+        case .notStopped(let why) where runner.isRunning: return why
         case .failed(let why) where !runner.isRunning: return why
         default: break
         }
@@ -148,16 +148,28 @@ struct TikpalHomeView: View {
         }
     }
 
+    /// The stop goes over the channel only a paired app has, so nothing else on the phone can stop the service. Pairing
+    /// takes one approval on the phone; the runner keeps the key across restarts. A key it has since rejected costs one
+    /// more approval, hence the second round.
     private func stop() async {
-        step = .stopping
-        if await runnerAdmin.stopRunner() {
-            // Give the runner a moment to close its port, or the probe still finds it.
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            await runner.check()
-            step = .idle
-        } else {
-            step = .confirmStop
-            await UIApplication.shared.open(Self.runnerStopURL)
+        for _ in 0..<2 {
+            if !runnerAdmin.isPaired {
+                step = .allowing
+                await runnerAdmin.connect()
+                guard runnerAdmin.isPaired else {
+                    step = .notStopped(runnerAdmin.notice ?? "没有允许，服务还在运行")
+                    return
+                }
+            }
+            step = .stopping
+            if await runnerAdmin.stopRunner() {
+                // Give the runner a moment to close its port, or the probe still finds it.
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                await runner.check()
+                step = .idle
+                return
+            }
         }
+        step = .notStopped(runnerAdmin.notice ?? "没有停下来，请再试一次")
     }
 }

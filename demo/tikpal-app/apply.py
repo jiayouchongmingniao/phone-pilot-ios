@@ -90,6 +90,7 @@ edit('iCTRLApp/iCTRLApp.swift', [('''                SettingsView()
 ''')])
 
 edit('iCTRLApp/Views/SettingsView.swift', [('.navigationTitle("iCTRL")', '.navigationTitle("Tikpal")')])
+edit('iCTRLApp/Models/RunnerClient.swift', [('static let clientName = "iCTRL App"', 'static let clientName = "Tikpal"')])
 
 # The tunnel is built in now.
 edit('iCTRLApp/DDI/LocalDevVPN.swift', [('''        UIApplication.shared.canOpenURL(probeURL)
