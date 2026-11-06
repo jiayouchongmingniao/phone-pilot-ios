@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Just before signing: names and hides the runner, and puts the Developer Disk Image inside the app.
+# Just before signing: names the runner, and puts the Developer Disk Image inside the app.
 #
 #   prepare-ipa.sh <iCTRLUITests-Runner.ipa> <iCTRL.ipa>
 #
@@ -19,10 +19,6 @@ trap 'rm -rf "${runner_dir:?}" "${app_dir:?}"' EXIT
 plist="$(find "$runner_dir/Payload" -maxdepth 2 -name Info.plist | head -1)"
 $PB -c 'Delete :CFBundleDisplayName' "$plist" 2>/dev/null || true
 $PB -c 'Add :CFBundleDisplayName string Tikpal Runner' "$plist"
-# Off the home screen: Tikpal starts and stops it, so there is nothing to tap here.
-$PB -c 'Delete :SBAppTags' "$plist" 2>/dev/null || true
-$PB -c 'Add :SBAppTags array' "$plist"
-$PB -c 'Add :SBAppTags:0 string hidden' "$plist"
 rm -f "$RUNNER_IPA"
 (cd "$runner_dir" && zip -qry "$RUNNER_IPA" Payload)
 
