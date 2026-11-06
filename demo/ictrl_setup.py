@@ -350,7 +350,11 @@ def cmd_install_ci(args):
     with tempfile.TemporaryDirectory() as tmp:
         fetched = run(['gh', 'run', 'download', run_id, '-R', CI_REPO, '-n', CI_ARTIFACT, '-D', tmp], check=False)
         if fetched.returncode != 0:
-            raise SetupError('最新一次构建没有签名产物：可能缺 IPHONE_UDID 或 ICTRL_ARTIFACT_PASSWORD 密钥，或产物已过期')
+            # 可能是产物真没有，也可能只是下载失败；gh 的原话能分清。
+            detail = (fetched.stderr or b'').decode('utf-8', 'replace').strip()[-300:]
+            raise SetupError(f'下载构建 {run_id} 的签名产物失败：{detail}\n'
+                             '网络问题可以设置 HTTPS_PROXY 或换网络后重试；'
+                             '如果提示找不到产物，可能缺 IPHONE_UDID、ICTRL_ARTIFACT_PASSWORD 密钥，或产物已过期')
         bundle = os.path.join(tmp, 'bundle.tar')
         run([OPENSSL, 'enc', '-d', '-aes-256-cbc', '-pbkdf2', '-in', os.path.join(tmp, 'ictrl-signed.tar.enc'),
              '-out', bundle, '-pass', 'file:' + args.password_file])
