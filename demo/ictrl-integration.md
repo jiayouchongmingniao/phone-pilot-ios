@@ -201,10 +201,10 @@ iCTRL 的代码是 Apache-2.0，可以商用；上游写的“只用于自动化
 
 ## 手机端准备
 
-runner 是 XCUITest，不能走 TestFlight。开发用的 Mac 没有 Xcode 和证书，所以在 GitHub Actions 里编译和签名（分支 `ictrl-ci`，工作流 `.github/workflows/ictrl.yml`）。
+runner 是 XCUITest，不能走 TestFlight。开发用的 Mac 没有 Xcode 和证书，所以在 GitHub Actions 里编译和签名（分支 `codex/phone-pilot-demo`，工作流 `.github/workflows/ictrl.yml`）。
 
 - `build` 从固定的上游提交（v1.98.16）编译，bundle id 换成 `io.tikpal.ictrl*`。这个任务会运行上游的构建脚本，所以不给任何密钥。
-- `sign` 用已有的 App Store Connect 仓库密钥准备证书、注册手机、创建通配 App ID（`io.tikpal.*`）和描述文件。它只运行本仓库的代码。
+- `sign` 用已有的 App Store Connect 仓库密钥准备证书、注册手机、创建通配 App ID（`io.tikpal.*`）和描述文件。描述文件包含账号里所有启用的 iPhone 和 iPad，所以账号里注册过的设备都能装这份产物。它只运行本仓库的代码。
 - 仓库是公开的，签名后的 IPA 含设备编号，只加密上传，保留 3 天。
 
 第一次要加两个仓库密钥。用 USB 把 iPhone 接到 Mac，解锁并信任，然后运行（值不经过聊天，也不进日志）：
@@ -230,6 +230,15 @@ python3 demo/ictrl_setup.py install-ci
 
 `demo/ictrl_setup.py provision` 和 `install` 是本机签名的备用路线，需要本机有 `.p8`。
 
+**加一台手机：** 只把新手机接到 Mac，解锁并信任，运行下面的命令。已注册的手机会留在描述文件里，不用重新签名和安装。不再使用的手机，到 Apple 开发者网站停用。
+
+```zsh
+ideviceinfo -k UniqueDeviceID | gh secret set IPHONE_UDID -R jiayouchongmingniao/phone-pilot-ios
+gh workflow run ictrl.yml -R jiayouchongmingniao/phone-pilot-ios --ref codex/phone-pilot-demo
+```
+
+等构建成功后，新手机仍只接它一台，运行 `python3 demo/ictrl_setup.py install-ci`，再做下面的手机端步骤。圆屏只记一台手机，换手机要在圆屏上改 IP 并重新配对。
+
 然后在手机上：
 
 1. 打开开发者模式：设置 › 隐私与安全性 › 开发者模式，重启。
@@ -251,7 +260,7 @@ CI 编译时用 `demo/tikpal-app/apply.py` 给固定版本的上游打补丁，�
 - **Tikpal Runner 图标：** 隐藏不了。试过在 Info.plist 里加 `SBAppTags`，iPhone 16e、iOS 27.2 上重启后图标还在，已撤掉。可以手动“从主屏幕移除”，它会留在 App 资源库；移除后还能否启动，没有实测。
 - **一个按钮开关服务：** App 首页只有状态和一个按钮。服务没运行时是“开始服务”，按需挂载镜像再启动；运行时是“停止服务”。第一次停止时 App 会和 runner 配对，要在通知上点一次“允许”，以后一点就停，重启后也不用再批准。没走上游那个每次都要长按确认的 `ictrl://stop`。上游的页面都在右上角齿轮里。
 - **内置隧道：** 不再需要 LocalDevVPN。扩展 `TikpalTunnel` 按上游文档的原理自己写，只把 `10.7.0.0/24` 的数据包地址对调后送回，别的流量不进隧道。App 和扩展要用带 Network Extension 权限的明确 App ID（`io.tikpal.ictrl`、`io.tikpal.ictrl.tunnel`）。
-- **镜像打包：** iOS 26.4 及以上用的那套（约 17 MB）放进 App，不用连 GitHub。更早的 iOS 仍走下载，需要能访问 GitHub。第一次挂载还是要联网向 Apple 申请签名。镜像是 Apple 的文件，所以只在产物加密的签名任务里放进去，公开的未签名产物里没有。
+- **镜像打包：** iOS 26.4 及以上的一套（约 17 MB）和 iOS 17 到 26.3 的一套都放进 App，App 按系统版本取用，不用连 GitHub。代价是每台手机都多占这些空间。iOS 16 及以下不能在 App 内挂载。挂载还是要联网向 Apple 申请签名。iOS 26.3 及以下这条路还没在真机上走过。镜像是 Apple 的文件，所以只在产物加密的签名任务里放进去，公开的未签名产物里没有。
 - **远程访问默认打开：** 别的设备仍然要在手机上点允许才能配对，只批准自己发起的配对。
 
 如果还用上游的挂载方式：iOS 只能同时开一个 VPN，要先开代理下载镜像，再连 LocalDevVPN 挂载。

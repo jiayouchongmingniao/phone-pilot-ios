@@ -24,12 +24,17 @@ rm -f "$RUNNER_IPA"
 
 (cd "$app_dir" && unzip -q "$APP_IPA")
 app="$(find "$app_dir/Payload" -maxdepth 1 -name '*.app' -type d | head -1)"
-# iOS 26.4 and later. An older iOS has no set here, and the app downloads its own as before.
-folder=Xcode_iOS_DDI_Cryptex
-mkdir -p "$app/DDI/$folder"
-for name in BuildManifest.plist Image.dmg Image.dmg.trustcache Image.dmg.cryptex_info Image.dmg.root_hash; do
-    curl -fsSL --retry 3 -o "$app/DDI/$folder/$name" "$MIRROR/$folder/$name"
-    echo "$name: $(wc -c < "$app/DDI/$folder/$name") bytes"
-done
+bundle_image() {
+    local folder="$1"
+    shift
+    mkdir -p "$app/DDI/$folder"
+    for name in "$@"; do
+        curl -fsSL --retry 3 -o "$app/DDI/$folder/$name" "$MIRROR/$folder/$name"
+        echo "$folder/$name: $(wc -c < "$app/DDI/$folder/$name") bytes"
+    done
+}
+# The app picks by iOS version. iOS 16 and earlier can't be mounted from the app at all.
+bundle_image Xcode_iOS_DDI_Cryptex BuildManifest.plist Image.dmg Image.dmg.trustcache Image.dmg.cryptex_info Image.dmg.root_hash  # iOS 26.4 and later
+bundle_image Xcode_iOS_DDI_Personalized BuildManifest.plist Image.dmg Image.dmg.trustcache  # iOS 17 to 26.3
 rm -f "$APP_IPA"
 (cd "$app_dir" && zip -qry "$APP_IPA" Payload)

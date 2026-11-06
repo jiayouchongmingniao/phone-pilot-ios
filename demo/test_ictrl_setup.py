@@ -46,7 +46,7 @@ class FakeAsc:
                     payload = json.dumps({'errors': [{'detail': owner.fail[(method, url.path)]}]}).encode()
                     self.send_response(409)
                 else:
-                    payload = json.dumps(owner.respond(method, url.path, body)).encode()
+                    payload = json.dumps(owner.respond(method, url.path, body, parse_qs(url.query))).encode()
                     self.send_response(201 if method == 'POST' else 200)
                 self.send_header('Content-Length', str(len(payload)))
                 self.end_headers()
@@ -60,15 +60,22 @@ class FakeAsc:
         self.base = f'http://127.0.0.1:{self.http.server_port}/v1'
         threading.Thread(target=self.http.serve_forever, daemon=True).start()
 
-    def respond(self, method, path, body):
+    def respond(self, method, path, body, query):
         kind = path.split('/')[2]
         store = {'devices': self.devices, 'bundleIds': self.bundles, 'certificates': self.certs, 'profiles': self.profiles}[kind]
         if method == 'GET':
+            if kind == 'devices' and 'filter[status]' in query:
+                return {'data': [d for d in store if d['attributes'].get('status') in query['filter[status]']]}
+            if kind == 'devices' and 'filter[udid]' in query:
+                wanted = query['filter[udid]']
+                return {'data': [d for d in store if d['attributes'].get('udid', wanted[0]) in wanted]}
             return {'data': store}
         if method == 'DELETE':
             store[:] = [item for item in store if item['id'] != path.split('/')[3]]
             return {}
         attributes = dict(body['data']['attributes'])
+        if kind == 'devices':
+            attributes.update(status='ENABLED', deviceClass='IPHONE')
         if kind == 'certificates':
             attributes['certificateContent'] = base64.b64encode(self.real_cert(attributes['csrContent'])).decode()
         if kind == 'profiles':
@@ -184,6 +191,18 @@ class Provision(Base):
         self.assertNotIn(UDID, output)
         self.assertNotIn('KEY1', output)
         self.assertNotIn(open(self.key).read()[:60], output)
+
+    def test_profile_keeps_phones_already_registered_and_leaves_out_others(self):
+        self.asc.devices += [
+            {'id': 'old-phone', 'attributes': {'udid': 'OLD', 'status': 'ENABLED', 'deviceClass': 'IPHONE'}},
+            {'id': 'off-phone', 'attributes': {'udid': 'OFF', 'status': 'DISABLED', 'deviceClass': 'IPHONE'}},
+            {'id': 'watch', 'attributes': {'udid': 'W', 'status': 'ENABLED', 'deviceClass': 'APPLE_WATCH'}},
+        ]
+        code, output = self.provision()
+        self.assertEqual(code, 0, output)
+        listed = self.asc.posts('profiles')[0][3]['data']['relationships']['devices']['data']
+        self.assertEqual({d['id'] for d in listed}, {'old-phone', 'devices-4'})
+        self.assertIn('2 台设备', output)
 
     def test_second_run_reuses_and_replaces_only_its_own_profile(self):
         self.assertEqual(self.provision()[0], 0)

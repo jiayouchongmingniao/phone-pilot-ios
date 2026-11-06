@@ -142,6 +142,12 @@ class Asc:
         made = self.create('devices', {'name': DEVICE_NAME, 'platform': 'IOS', 'udid': udid})
         return made['id'], True
 
+    def registered_iphones(self):
+        """账号里启用的 iPhone 和 iPad。描述文件要列出全部，这样加一台手机时，已经在用的不会被挤掉。"""
+        query = urllib.parse.urlencode({'filter[platform]': 'IOS', 'filter[status]': 'ENABLED', 'limit': 200})
+        devices = self.call('GET', '/devices?' + query)['data']
+        return [d['id'] for d in devices if d['attributes'].get('deviceClass') in ('IPHONE', 'IPAD')]
+
     def ensure_wildcard(self, identifier='*'):
         return self.ensure_wildcard_named(identifier, WILDCARD_NAME)
 
@@ -166,7 +172,7 @@ class Asc:
         query = urllib.parse.urlencode({'filter[certificateType]': 'DEVELOPMENT,IOS_DEVELOPMENT', 'limit': 200})
         return self.call('GET', '/certificates?' + query)['data']
 
-    def replace_profile(self, bundle_id, cert_id, device_id, name=PROFILE_NAME):
+    def replace_profile(self, bundle_id, cert_id, device_ids, name=PROFILE_NAME):
         # 描述文件不能改，只替换本工具建的这一个，账号里其他的不碰。
         query = urllib.parse.urlencode({'filter[name]': name})
         for old in self.call('GET', '/profiles?' + query)['data']:
@@ -175,7 +181,7 @@ class Asc:
         return self.create('profiles', {'name': name, 'profileType': 'IOS_APP_DEVELOPMENT'}, {
             'bundleId': {'data': {'type': 'bundleIds', 'id': bundle_id}},
             'certificates': {'data': [{'type': 'certificates', 'id': cert_id}]},
-            'devices': {'data': [{'type': 'devices', 'id': device_id}]}})
+            'devices': {'data': [{'type': 'devices', 'id': device_id} for device_id in device_ids]}})
 
 
 # ---------------------------------------------------------------- 钥匙串
@@ -264,12 +270,15 @@ def cmd_provision(args):
     print('  - 注册这台 iPhone（占用账号的设备名额）')
     print(f'  - 确认通配 App ID（{args.app_id}），它要能覆盖 runner 和 iCTRL App 的 bundle id')
     print('  - ' + ('复用钥匙串里已有的开发证书' if reusable else '新建一张开发证书，私钥放进钥匙串'))
-    print(f'  - 创建或替换描述文件“{PROFILE_NAME}”')
+    print(f'  - 创建或替换描述文件“{PROFILE_NAME}”，包含账号里已注册的所有 iPhone 和 iPad')
     if not args.yes and input('继续？[y/N] ').strip().lower() != 'y':
         print('已取消，账号未改动')
         return 1
     device_id, new_device = asc.ensure_device(udid)
     print('设备：' + ('已注册' if new_device else '已存在'))
+    registered = asc.registered_iphones()
+    device_ids = registered if device_id in registered else [*registered, device_id]
+    print(f'描述文件包含 {len(device_ids)} 台设备')
     bundle_id, new_bundle = asc.ensure_wildcard(args.app_id)
     print('App ID：' + ('已创建' if new_bundle else '已存在'))
     import_wwdr()
@@ -280,14 +289,14 @@ def cmd_provision(args):
     if sha1 not in keychain_identities():
         raise SetupError('证书导入后 codesign 仍不认，请查看钥匙串里的 Apple Development 证书是否受信任')
     print('证书：可用')
-    path = save_profile(asc.replace_profile(bundle_id, cert_id, device_id), 'phone-pilot.mobileprovision')
+    path = save_profile(asc.replace_profile(bundle_id, cert_id, device_ids), 'phone-pilot.mobileprovision')
     print('描述文件：已保存到 ' + path)
     if args.tikpal_app:
         # 改造后的 App 带内置隧道：App 和扩展各要一个明确的 App ID 和描述文件。
         for identifier, name, filename in ((args.tikpal_app, TIKPAL_APP_PROFILE, 'tikpal-app.mobileprovision'),
                                            (args.tikpal_app + '.tunnel', TIKPAL_TUNNEL_PROFILE, 'tikpal-tunnel.mobileprovision')):
             explicit = asc.ensure_network_extension(identifier, name)
-            save_profile(asc.replace_profile(explicit, cert_id, device_id, name), filename)
+            save_profile(asc.replace_profile(explicit, cert_id, device_ids, name), filename)
         print('内置隧道的 App ID 和描述文件：已就绪')
     print('下一步：python3 demo/ictrl_setup.py install')
     return 0
