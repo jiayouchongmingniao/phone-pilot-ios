@@ -107,7 +107,7 @@ Qwen 的回答不直接执行。固件会回到原句再核对一次，下面的
 
 - 第一次连接时圆屏显示指纹，在手机通知里允许。密钥存在圆屏 NVS（命名空间 `phone_pilot`）。
 - 连不上手机时，圆屏会显示 IP 输入框，不需要电脑。
-- 手机重启后要重新挂载 Developer Disk Image。不用 Mac 的路径见下面的“手机端准备”，还没有实测。
+- 手机重启后要重新挂载 Developer Disk Image。不用 Mac 就能做，步骤见下面的“手机重启后”。
 
 ### 验证状态（2026-11-05）
 
@@ -117,11 +117,11 @@ Qwen 的回答不直接执行。固件会回到原句再核对一次，下面的
 - Qwen 文字模型三十句测试：打开、输入、发送、否定、多目标、闲聊、转账等。
 - 上面语音指令表里的全部指令，包括微信发消息、回复、读消息、查未读、搜索、页面入口、通话和写朋友圈。
 - 打车下单（语音到司机接单）。
+- 手机重启后不用 Mac 重新挂载 Developer Disk Image，挂载后断开 LocalDevVPN，圆屏仍能操作手机。
 
 还没有单独记录的情况：
 
 - 同名联系人、输入框已有草稿、结果不明时的停止，这些由单元测试覆盖。
-- 手机重启后不用 Mac 重新挂载 Developer Disk Image。
 - 高德路线、换方案、搜索、定位，名字带符号的地点，交通枢纽的下车点，语音“取消打车”：代码和单元测试完成，真机未确认。
 - 手机换地址后圆屏自动查找：只有地址顺序的单元测试。
 
@@ -235,9 +235,27 @@ python3 demo/ictrl_setup.py install-ci
    - 装 LocalDevVPN 并连接。VPN 类 App 在中国区商店可能搜不到，那就需要换其他地区的 Apple ID 下载。
    - 用 [idevice_pair](https://github.com/jkcoxson/idevice_pair) 在 Mac 上选 Remote pairing 生成配对文件，AirDrop 到手机，导入 iCTRL App。
    - 在 iCTRL App 的 Settings › Runtime requirements › Mount without a Mac 里按提示挂载。首次要联网。
-   - **每次重启手机都要重新挂载。**
+   - **每次重启手机都要重新挂载。** 步骤见下面的“手机重启后”。
 4. 打开 runner，允许通知和本地网络，按需输入锁屏密码。
 5. 长按 runner 的通知，选“Enable Remote Access”。
+
+## 手机重启后
+
+已在真机确认，全程不用 Mac：
+
+1. 解锁手机，连上 LocalDevVPN。
+2. 打开 iCTRL App，在挂载页面点重新挂载。
+3. 断开 LocalDevVPN。它只在挂载时用，它不是真的 VPN，只是把发给 `10.7.0.1` 的数据包反射回手机。
+4. 启动 runner，在通知里打开远程访问。
+
+### 第一次下载镜像
+
+镜像约 100 MB，从 GitHub 下载，只在第一次要下，iOS 大版本更新后可能要重下。国内网络下可能一直停在 Downloading。iOS 同一时间只能开一个 VPN，代理和 LocalDevVPN 不能同时开，所以要分两步：
+
+1. 断开 LocalDevVPN，打开代理，在 iCTRL App 里下载镜像。下完的文件会留在手机上。
+2. 关掉代理，连上 LocalDevVPN，点挂载。第一次挂载要联网向 Apple 申请签名。
+
+App 里没有手动导入镜像的入口。
 
 ## Mac 端
 

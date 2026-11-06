@@ -70,7 +70,7 @@ runner 支持 iOS 16 及以上，目前只实测过 iPhone 16e、iOS 27.2。微�
 - **账号风险：** App 可能检测到自动化操作，微信等账号要自己权衡，并遵守各 App 的条款。
 - **商用限制：** iCTRL 的代码是 Apache-2.0，上游警告只用于测试和研究。真正卡商用的是苹果的规则和各 App 的条款，要商用请先找律师确认。
 - **打车会花钱：** 说完就叫车，不再确认，只靠距离和价格上限等检查拦截。
-- **手机重启后：** 要重新挂载 Developer Disk Image，不用 Mac 的路径还没有实测。
+- **手机重启后：** 要重新挂载 Developer Disk Image。已实测不用 Mac：连上 LocalDevVPN，在 iCTRL App 里重新挂载，挂载后可以断开 VPN。步骤见 [手机重启后](demo/ictrl-integration.md#手机重启后)。
 
 ## 致谢
 
