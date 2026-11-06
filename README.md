@@ -46,6 +46,7 @@
 |---|---|
 | [demo/ictrl-integration.md](demo/ictrl-integration.md) | 圆屏直连方案、安全规则、安装 runner 的步骤和验证状态，先看这份 |
 | `.github/workflows/ictrl.yml`、`demo/ictrl_setup.py` | 在 GitHub Actions 里编译、签名 runner，再安装到手机 |
+| `demo/tikpal-app/` | 编译时打给上游的补丁：改名、一键恢复、内置隧道、打包镜像 |
 | `demo/ictrl_driver.py`、`demo/ictrl_probe.py` | Mac 上调试 runner 的命令行工具，真机验收也用它 |
 | [demo/README.md](demo/README.md)、`demo/server.py` | 早期经过 Mac 的路径，可选走 iCTRL，默认走录屏和 USB 键鼠 |
 | `Sources/`、`project.yml`、[docs/ci.md](docs/ci.md) | iPhone 端 App（屏幕共享），用 XcodeGen 生成工程，在云端编译并发到 TestFlight，最低 iOS 27，圆屏直连用不到 |
@@ -70,7 +71,7 @@ runner 支持 iOS 16 及以上，目前只实测过 iPhone 16e、iOS 27.2。微�
 - **账号风险：** App 可能检测到自动化操作，微信等账号要自己权衡，并遵守各 App 的条款。
 - **商用限制：** iCTRL 的代码是 Apache-2.0，上游警告只用于测试和研究。真正卡商用的是苹果的规则和各 App 的条款，要商用请先找律师确认。
 - **打车会花钱：** 说完就叫车，不再确认，只靠距离和价格上限等检查拦截。
-- **手机重启后：** 要重新挂载 Developer Disk Image。已实测不用 Mac：连上 LocalDevVPN，在 iCTRL App 里重新挂载，挂载后可以断开 VPN。步骤见 [手机重启后](demo/ictrl-integration.md#手机重启后)。
+- **手机重启后：** 打开 Tikpal 点“恢复”就行，不用 Mac，也不用再装 LocalDevVPN。第一次还要用 Mac 生成一次配对文件。步骤见 [手机重启后](demo/ictrl-integration.md#手机重启后)。
 
 ## 致谢
 
