@@ -46,7 +46,7 @@
 |---|---|
 | [demo/ictrl-integration.md](demo/ictrl-integration.md) | 圆屏直连方案、安全规则、安装 runner 的步骤和验证状态，先看这份 |
 | `.github/workflows/ictrl.yml`、`demo/ictrl_setup.py` | 在 GitHub Actions 里编译、签名 runner，再安装到手机 |
-| `demo/tikpal-app/` | 编译时打给上游的补丁：改名、一键恢复、内置隧道、打包镜像 |
+| `demo/tikpal-app/` | 编译时打给上游的补丁：改名、图标、一键恢复、内置隧道、打包镜像 |
 | `demo/ictrl_driver.py`、`demo/ictrl_probe.py` | Mac 上调试 runner 的命令行工具，真机验收也用它 |
 | [demo/README.md](demo/README.md)、`demo/server.py` | 早期经过 Mac 的路径，可选走 iCTRL，默认走录屏和 USB 键鼠 |
 | `Sources/`、`project.yml`、[docs/ci.md](docs/ci.md) | iPhone 端 App（屏幕共享），用 XcodeGen 生成工程，在云端编译并发到 TestFlight，最低 iOS 27，圆屏直连用不到 |

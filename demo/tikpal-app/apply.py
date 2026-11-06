@@ -40,6 +40,15 @@ shutil.copytree(os.path.join(HERE, 'TikpalTunnel'), os.path.join(ROOT, 'TikpalTu
 for name in ('InAppTunnel.swift', 'TikpalHomeView.swift'):
     shutil.copy(os.path.join(HERE, 'iCTRLApp', name), os.path.join(ROOT, 'iCTRLApp', name))
 
+# Icons, made by make-icons.py. The set must match upstream's, so a new size upstream stops the build here.
+shutil.copy(os.path.join(HERE, 'icon_1024x1024.png'),
+            os.path.join(ROOT, 'iCTRLApp/Assets.xcassets/AppIcon.appiconset/icon_1024x1024.png'))
+RUNNER_ICONS = os.path.join(ROOT, 'Config/RunnerIcon')
+if sorted(os.listdir(RUNNER_ICONS)) != sorted(os.listdir(os.path.join(HERE, 'RunnerIcon'))):
+    sys.exit(f'{RUNNER_ICONS}: upstream has a different set of icons')
+shutil.rmtree(RUNNER_ICONS)
+shutil.copytree(os.path.join(HERE, 'RunnerIcon'), RUNNER_ICONS)
+
 edit('project.yml', [
     ('''      - framework: Frameworks/IDevice.xcframework
         embed: false

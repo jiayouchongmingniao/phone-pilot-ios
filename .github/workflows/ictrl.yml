@@ -42,7 +42,7 @@ jobs:
         with:
           path: tikpal
           persist-credentials: false
-      - name: 改造成 Tikpal（改名、一键恢复、内置隧道）
+      - name: 改造成 Tikpal（改名、图标、一键恢复、内置隧道）
         run: python3 tikpal/demo/tikpal-app/apply.py .
       - name: Xcode 版本
         run: xcodebuild -version

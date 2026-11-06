@@ -246,7 +246,7 @@ python3 demo/ictrl_setup.py install-ci
 
 CI 编译时用 `demo/tikpal-app/apply.py` 给固定版本的上游打补丁，不改上游仓库。上游一变，补丁对不上，编译就会停下。
 
-- **改名：** App 叫 Tikpal，runner 叫 Tikpal Runner，通知文字一起改。图标还是上游的。bundle id 不变。
+- **改名和图标：** App 叫 Tikpal，runner 叫 Tikpal Runner，通知文字一起改。两个都用 Tikpal 图标，由 `make-icons.py` 从 300×300 的 logo 放大生成；有更大的原图时重跑一次就好。bundle id 不变。
 - **一键恢复：** App 首页只有状态和“恢复”按钮，上游的页面都在右上角齿轮里。
 - **内置隧道：** 不再需要 LocalDevVPN。扩展 `TikpalTunnel` 按上游文档的原理自己写，只把 `10.7.0.0/24` 的数据包地址对调后送回，别的流量不进隧道。App 和扩展要用带 Network Extension 权限的明确 App ID（`io.tikpal.ictrl`、`io.tikpal.ictrl.tunnel`）。
 - **镜像打包：** iOS 26.4 及以上用的那套（约 17 MB）放进 App，不用连 GitHub。更早的 iOS 仍走下载，需要能访问 GitHub。第一次挂载还是要联网向 Apple 申请签名。镜像是 Apple 的文件，所以只在产物加密的签名任务里放进去，公开的未签名产物里没有。
