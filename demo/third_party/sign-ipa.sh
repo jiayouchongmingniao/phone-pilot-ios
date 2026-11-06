@@ -10,6 +10,9 @@
 #                            for the team that covers the package's bundle id
 #       [-s IDENTITY]        signing identity name or SHA-1; default: the
 #                            keychain identity whose certificate is in the profile
+#       [-x PROFILE]         a .mobileprovision path for the package's .appex,
+#                            whose app and extension then get the Network
+#                            Extension entitlement (added for the Tikpal build)
 #
 # Works for both packages (the runner and the iCTRL host app). macOS only — it
 # uses Apple's `codesign`.
@@ -33,14 +36,15 @@ usage() {
     exit 1
 }
 
-IPA="" IDENTITY="" PROFILE="" OUT="" TEAM=""
-while getopts "i:s:p:o:t:h" opt; do
+IPA="" IDENTITY="" PROFILE="" OUT="" TEAM="" EXT_PROFILE=""
+while getopts "i:s:p:o:t:x:h" opt; do
     case "$opt" in
         i) IPA="$OPTARG" ;;
         s) IDENTITY="$OPTARG" ;;
         p) PROFILE="$OPTARG" ;;
         o) OUT="$OPTARG" ;;
         t) TEAM="$OPTARG" ;;
+        x) EXT_PROFILE="$OPTARG" ;;
         *) usage ;;
     esac
 done
@@ -183,25 +187,33 @@ echo "   identity $IDENTITY_NAME"
 cp "$PROFILE" "$APP/embedded.mobileprovision"
 
 # ── Entitlements for the outer app ────────────────────────────────────────
-ENT="$WORK/entitlements.plist"
-cat > "$ENT" <<EOF
+NETWORK_EXTENSION=""
+if [[ -n "$EXT_PROFILE" ]]; then
+    NETWORK_EXTENSION="<key>com.apple.developer.networking.networkextension</key><array><string>packet-tunnel-provider</string></array>"
+fi
+write_entitlements() {   # bundle-id file
+    cat > "$2" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>application-identifier</key>
-    <string>$TEAM.$BUNDLE_ID</string>
+    <string>$TEAM.$1</string>
     <key>com.apple.developer.team-identifier</key>
     <string>$TEAM</string>
     <key>get-task-allow</key>
     <true/>
     <key>keychain-access-groups</key>
     <array>
-        <string>$TEAM.$BUNDLE_ID</string>
+        <string>$TEAM.$1</string>
     </array>
+    $NETWORK_EXTENSION
 </dict>
 </plist>
 EOF
+}
+ENT="$WORK/entitlements.plist"
+write_entitlements "$BUNDLE_ID" "$ENT"
 
 # Quiet on success ("replacing existing signature" for every file is noise);
 # the full codesign output on failure.
@@ -233,7 +245,14 @@ done < <(find "$APP" -name '*.framework' -type d | awk '{ print length, $0 }' | 
 
 for plugin in "$APP"/PlugIns/*; do
     [[ -d "$plugin" ]] || continue
-    sign "$plugin"; echo "   signed ${plugin#"$APP/"}"
+    if [[ "$plugin" == *.appex && -n "$EXT_PROFILE" ]]; then
+        cp "$EXT_PROFILE" "$plugin/embedded.mobileprovision"
+        write_entitlements "$($PB -c 'Print :CFBundleIdentifier' "$plugin/Info.plist")" "$WORK/appex.plist"
+        sign --entitlements "$WORK/appex.plist" "$plugin"
+    else
+        sign "$plugin"
+    fi
+    echo "   signed ${plugin#"$APP/"}"
 done
 
 sign --entitlements "$ENT" "$APP"

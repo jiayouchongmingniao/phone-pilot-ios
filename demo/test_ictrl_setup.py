@@ -448,6 +448,39 @@ class Install(Base):
         self.assertIn('provision', output)
 
 
+class TikpalAppId(unittest.TestCase):
+    def asc(self, bundles, capabilities):
+        asc = ictrl_setup.Asc('token')
+        asc.created = []
+
+        def call(method, path, body=None):
+            return {'data': capabilities if 'bundleIdCapabilities' in path else bundles}
+
+        def create(kind, attributes, relationships=None):
+            asc.created.append((kind, attributes, relationships))
+            return {'id': 'new'}
+        asc.call, asc.create = call, create
+        return asc
+
+    def test_new_id_gets_the_capability(self):
+        asc = self.asc([], [])
+        self.assertEqual(asc.ensure_network_extension('io.tikpal.ictrl', 'x'), 'new')
+        self.assertEqual([kind for kind, _, _ in asc.created], ['bundleIds', 'bundleIdCapabilities'])
+        self.assertEqual(asc.created[1][1], {'capabilityType': 'NETWORK_EXTENSIONS'})
+
+    def test_existing_id_with_the_capability_is_left_alone(self):
+        bundles = [{'id': 'b1', 'attributes': {'identifier': 'io.tikpal.ictrl'}}]
+        capabilities = [{'attributes': {'capabilityType': 'NETWORK_EXTENSIONS'}}]
+        asc = self.asc(bundles, capabilities)
+        self.assertEqual(asc.ensure_network_extension('io.tikpal.ictrl', 'x'), 'b1')
+        self.assertEqual(asc.created, [])
+
+    def test_a_similar_id_is_not_taken_for_it(self):
+        bundles = [{'id': 'b1', 'attributes': {'identifier': 'io.tikpal.ictrl.tunnel'}}]
+        asc = self.asc(bundles, [])
+        self.assertEqual(asc.ensure_network_extension('io.tikpal.ictrl', 'x'), 'new')
+
+
 class PinnedRelease(unittest.TestCase):
     def test_sign_script_is_vendored(self):
         self.assertTrue(os.path.isfile(ictrl_setup.SIGN_SCRIPT))

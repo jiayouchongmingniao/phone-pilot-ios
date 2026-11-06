@@ -12,3 +12,5 @@
 ## iCTRL
 
 `ictrl_rpc.py` 和 `sign-ipa.sh` 是 [OpenMinis/iCTRL](https://github.com/OpenMinis/iCTRL) 提交 `c1e4268859ba858d1579f7b846a56cb40641b7f6`（v1.98.16）的 `Scripts/` 下同名文件，Apache-2.0，未修改。完整许可见 [iCTRL.LICENSE](iCTRL.LICENSE)。`demo/ictrl_driver.py` 是本地编写的调用层，运行时需要手机上另装 iCTRL runner，未引入其他上游代码。
+
+`sign-ipa.sh` 为 Tikpal 版加了 `-x` 选项：给 App 里的 `.appex` 单独放描述文件，并给 App 和扩展加 Network Extension 权限。

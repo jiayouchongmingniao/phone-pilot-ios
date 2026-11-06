@@ -9,11 +9,12 @@ name: iCTRL build
 
 on:
   push:
-    branches: [ictrl-ci]
+    branches: [ictrl-ci, codex/phone-pilot-demo]
     paths:
       - .github/workflows/ictrl.yml
       - demo/ictrl_setup.py
       - demo/third_party/sign-ipa.sh
+      - demo/tikpal-app/**
   workflow_dispatch:
 
 permissions:
@@ -37,6 +38,12 @@ jobs:
           repository: OpenMinis/iCTRL
           ref: ${{ env.ICTRL_COMMIT }}
           persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          path: tikpal
+          persist-credentials: false
+      - name: 改造成 Tikpal（改名、一键恢复、内置隧道）
+        run: python3 tikpal/demo/tikpal-app/apply.py .
       - name: Xcode 版本
         run: xcodebuild -version
       - name: 安装 XcodeGen
@@ -133,7 +140,7 @@ jobs:
           (umask 077; printf '%s\n' "$ASC_KEY_P8" > "$KEY")
           python3 demo/ictrl_setup.py provision --yes \
             --key-file "$KEY" --key-id "$ASC_KEY_ID" --issuer-id "$ASC_ISSUER_ID" \
-            --udid "$IPHONE_UDID" --app-id "$BUNDLE_PREFIX.*" \
+            --udid "$IPHONE_UDID" --app-id "$BUNDLE_PREFIX.*" --tikpal-app "$BUNDLE_PREFIX.ictrl" \
             --export-p12 "$RUNNER_TEMP/dev-cert.p12"
           # Without this, codesign waits for a keychain dialog nobody can answer.
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" "$ICTRL_KEYCHAIN" > /dev/null
@@ -143,12 +150,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/out"
-          for ipa in iCTRLUITests-Runner iCTRL; do
-            # stdout names the team and profile; this log is public.
-            LC_ALL=C bash demo/third_party/sign-ipa.sh -i "unsigned/$ipa.ipa" \
-              -p "$HOME/.ictrl/setup/phone-pilot.mobileprovision" -o "$RUNNER_TEMP/out/$ipa-signed.ipa" > /dev/null
-            echo "$ipa: 已签名"
-          done
+          # The image goes in here and not in `build`: this job's output is encrypted, and that one's is public.
+          bash demo/tikpal-app/prepare-ipa.sh unsigned/iCTRLUITests-Runner.ipa unsigned/iCTRL.ipa
+          SETUP="$HOME/.ictrl/setup"
+          # stdout names the team and profile; this log is public.
+          LC_ALL=C bash demo/third_party/sign-ipa.sh -i unsigned/iCTRLUITests-Runner.ipa \
+            -p "$SETUP/phone-pilot.mobileprovision" -o "$RUNNER_TEMP/out/iCTRLUITests-Runner-signed.ipa" > /dev/null
+          echo "runner: 已签名"
+          LC_ALL=C bash demo/third_party/sign-ipa.sh -i unsigned/iCTRL.ipa \
+            -p "$SETUP/tikpal-app.mobileprovision" -x "$SETUP/tikpal-tunnel.mobileprovision" \
+            -o "$RUNNER_TEMP/out/iCTRL-signed.ipa" > /dev/null
+          echo "app: 已签名"
       - name: 打包并加密
         if: steps.secrets.outputs.ready == 'true'
         shell: bash
